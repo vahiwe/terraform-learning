@@ -8,11 +8,22 @@ variable "server_port" {
     description = "The port the server will use for HTTP requests"
 }
 
-resource "aws_instance" "web" {
+# Get default VPC and subnet IDs
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_launch_configuration" "web_launch_configuration" {
   instance_type = "t2.micro"
-  ami = "ami-08d4ac5b634553e16"
-  user_data_replace_on_change = true
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  image_id = "ami-08d4ac5b634553e16"
+  security_groups = [aws_security_group.web_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -20,10 +31,27 @@ resource "aws_instance" "web" {
               nohup busybox httpd -f -p ${var.server_port} &
               EOF
 
-  tags = {
-    Name = "terraform-example"
-  }
+  # Required when using a launch configuration with an auto scaling group.
+  lifecycle {
+    create_before_destroy = true
+  }   
 }
+
+resource "aws_autoscaling_group" "web_asg" {
+    launch_configuration = aws_launch_configuration.web_launch_configuration.name
+    vpc_zone_identifier = data.aws_subnets.default.ids
+
+    min_size = 2
+    max_size = 10
+    
+    tag {
+        key = "Name"
+        value = "web-asg"
+        propagate_at_launch = true
+        }
+}
+
+
 
 resource "aws_security_group" "web_sg" {
     name = "terraform-example-web-sg"
@@ -35,9 +63,4 @@ resource "aws_security_group" "web_sg" {
       protocol = "tcp"
       to_port = var.server_port
     } 
-}
-
-output "public_ip" {
-  value = aws_instance.web.public_ip
-  description = "The public IP address of the web server"
 }
