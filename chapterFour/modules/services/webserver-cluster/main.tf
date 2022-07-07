@@ -1,3 +1,11 @@
+locals {
+  http_port    = 80
+  any_port     = 0
+  any_protocol = "-1"
+  tcp_protocol = "tcp"
+  all_ips      = ["0.0.0.0/0"]
+}
+
 # Get default VPC and subnet IDs
 data "aws_vpc" "default" {
   default = true
@@ -59,10 +67,10 @@ resource "aws_security_group" "web_sg" {
     name = "${var.cluster_name}-web-sg"
 
     ingress {
-      cidr_blocks = [ "0.0.0.0/0" ]
+      cidr_blocks = local.all_ips
       description = "Allow all from anywhere to port 8080"
       from_port = var.server_port
-      protocol = "tcp"
+      protocol = local.tcp_protocol
       to_port = var.server_port
     } 
 }
@@ -77,7 +85,7 @@ resource "aws_lb" "web_alb" {
 resource "aws_lb_listener" "web_alb_listener" {
     load_balancer_arn = aws_lb.web_alb.arn
     protocol = "HTTP"
-    port = "80"
+    port = local.http_port
 
     # By default, return a simple 404 page
     default_action {
@@ -96,18 +104,18 @@ resource "aws_security_group" "web_alb" {
 
   # Allow inbound HTTP requests
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = local.http_port
+    to_port     = local.http_port
+    protocol    = local.tcp_protocol
+    cidr_blocks = local.all_ips
   }
 
   # Allow all outbound requests
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = local.any_port
+    to_port     = local.any_port
+    protocol    = local.any_protocol
+    cidr_blocks = local.all_ips
   }
 }
 
