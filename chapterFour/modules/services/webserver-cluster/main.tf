@@ -34,7 +34,7 @@ resource "aws_launch_configuration" "web_launch_configuration" {
   security_groups = [aws_security_group.web_sg.id]
 
   # Render the User Data script as a template
-  user_data = templatefile("user-data.sh", {
+  user_data = templatefile("${path.module}/user-data.sh", {
     server_port = var.server_port
     db_address  = data.terraform_remote_state.db.outputs.address
     db_port     = data.terraform_remote_state.db.outputs.port
@@ -65,14 +65,17 @@ resource "aws_autoscaling_group" "web_asg" {
 
 resource "aws_security_group" "web_sg" {
     name = "${var.cluster_name}-web-sg"
+}
 
-    ingress {
-      cidr_blocks = local.all_ips
-      description = "Allow all from anywhere to port 8080"
-      from_port = var.server_port
-      protocol = local.tcp_protocol
-      to_port = var.server_port
-    } 
+resource "aws_security_group_rule" "web_sg_inbound" {
+  type              = "ingress"
+  security_group_id = aws_security_group.web_sg.id
+
+  cidr_blocks = local.all_ips
+  description = "Allow all from anywhere to port 8080"
+  from_port = var.server_port
+  protocol = local.tcp_protocol
+  to_port = var.server_port
 }
 
 resource "aws_lb" "web_alb" {
@@ -101,22 +104,28 @@ resource "aws_lb_listener" "web_alb_listener" {
 
 resource "aws_security_group" "web_alb" {
   name = "${var.cluster_name}-alb-sg"
+}
+
+resource "aws_security_group_rule" "allow_http_inbound" {
+  type              = "ingress"
+  security_group_id = aws_security_group.web_alb.id
 
   # Allow inbound HTTP requests
-  ingress {
-    from_port   = local.http_port
-    to_port     = local.http_port
-    protocol    = local.tcp_protocol
-    cidr_blocks = local.all_ips
-  }
+  from_port   = local.http_port
+  to_port     = local.http_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
+resource "aws_security_group_rule" "allow_all_outbound" {
+  type              = "egress"
+  security_group_id = aws_security_group.web_alb.id
 
   # Allow all outbound requests
-  egress {
-    from_port   = local.any_port
-    to_port     = local.any_port
-    protocol    = local.any_protocol
-    cidr_blocks = local.all_ips
-  }
+  from_port   = local.any_port
+  to_port     = local.any_port
+  protocol    = local.any_protocol
+  cidr_blocks = local.all_ips
 }
 
 resource "aws_lb_target_group" "asg" {

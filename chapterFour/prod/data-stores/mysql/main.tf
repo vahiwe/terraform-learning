@@ -16,9 +16,14 @@ module "mysql" {
 
   cluster_name     = "mysql-prod"
   db_instance_type = "db.t2.micro"
-  db_name          = "prod-mysql"
+  db_name          = "prodmysql"
   db_allocated_storage = 10
   
+  # How should we set the username and password?
+  # Gotten from the variables.tf file.
+  # Picks value from environment variable if set.
+  # var.db_username = TF_VAR_db_username
+  # var.db_password = TF_VAR_db_password
   db_username      = var.db_username
   db_password      = var.db_password
 
